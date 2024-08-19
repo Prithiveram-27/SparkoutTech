@@ -2,7 +2,7 @@ class MineExchangeModel {
   final int statusCode;
   final bool status;
   final String message;
-  final List<ProjectModel> data; // Changed to List<ProjectModel>
+  final List<ProjectModel> data;
 
   MineExchangeModel({
     required this.statusCode,
@@ -12,7 +12,6 @@ class MineExchangeModel {
   });
 
   factory MineExchangeModel.fromJson(Map<String, dynamic> json) {
-    // Assuming 'data' is a list of projects
     var list = json['data'] as List;
     List<ProjectModel> projects =
         list.map((i) => ProjectModel.fromJson(i)).toList();

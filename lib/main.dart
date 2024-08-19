@@ -3,6 +3,7 @@ import 'package:mineexchange/screens/filter_screen.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_Screen.dart';
 import 'viewmodels/mine_exchange_view_model.dart';
+import 'viewmodels/filters_view_model.dart';
 
 void main() {
   runApp(MyApp());
@@ -11,8 +12,11 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => MineExchangeViewModel(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => MineExchangeViewModel()),
+        ChangeNotifierProvider(create: (_) => FiltersViewModel()),
+      ],
       child: MaterialApp(
         title: 'MVVM Example',
         theme: ThemeData(
@@ -21,7 +25,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         home: HomeScreen(),
         routes: {
-          FilterScreen.route: (context) => FilterScreen(),
+          FilterScreen.route: (context) => const FilterScreen(),
         },
       ),
     );

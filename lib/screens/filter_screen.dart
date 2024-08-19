@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../viewmodels/filters_view_model.dart';
 
 class FilterScreen extends StatefulWidget {
   const FilterScreen({super.key});
@@ -13,27 +15,36 @@ class _FilterScreenState extends State<FilterScreen> {
   String? _selectedOption2;
   String? _selectedOption3;
   String? _selectedOption4;
+  int? _selectedMinPrice;
+  int? _selectedMaxPrice;
+  final Map<String, bool> _selectedcheckboxOptions = {};
 
-  final Map<String, bool> _selectedcheckboxOptions = {
-    'All': false,
-    'Copper': false,
-    'Nickel': false,
-    'Lead': false,
-    'Zinc': false,
-    'Gold': false,
-    'Cobalt': false,
-    'Sand': false,
-    'Steel': false,
-    'Iron ore': false,
-    'Tin': false,
-    'Magnesium': false,
-    'Gravel': false,
-    'Silver': false,
-  };
+  @override
+  void initState() {
+    Provider.of<FiltersViewModel>(context, listen: false).fetchFiltersData();
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     double screenHeight = MediaQuery.of(context).size.height;
+    final filtersViewModel = Provider.of<FiltersViewModel>(context);
+
+    if (filtersViewModel.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (filtersViewModel.error != null) {
+      return Center(child: Text(filtersViewModel.error!));
+    }
+
+    if (_selectedcheckboxOptions.isEmpty &&
+        filtersViewModel.commodities.isNotEmpty) {
+      for (var commodity in filtersViewModel.commodities) {
+        _selectedcheckboxOptions[commodity] = false;
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Filters"),
@@ -43,7 +54,6 @@ class _FilterScreenState extends State<FilterScreen> {
       body: SingleChildScrollView(
         child: Container(
           color: Colors.grey.shade200,
-          // height: screenHeight,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Column(
@@ -61,14 +71,13 @@ class _FilterScreenState extends State<FilterScreen> {
                 Wrap(
                   spacing: 5,
                   runSpacing: 0,
-                  children: [
-                    buildRadioTile('Asia'),
-                    buildRadioTile('Africa'),
-                    buildRadioTile('North America'),
-                    buildRadioTile('South America'),
-                    buildRadioTile('Europe'),
-                    buildRadioTile('Australia'),
-                  ],
+                  children: filtersViewModel.continents.map((continent) {
+                    return buildRadioTile(continent, _selectedOption1, (value) {
+                      setState(() {
+                        _selectedOption1 = value;
+                      });
+                    });
+                  }).toList(),
                 ),
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -82,16 +91,12 @@ class _FilterScreenState extends State<FilterScreen> {
                 ),
                 Wrap(
                   spacing: 5,
-                  runSpacing: 0,
-                  children: [
-                    buildRadioTile2('All Sectors'),
-                    buildRadioTile2('Base Metals'),
-                    buildRadioTile2('Precious Metals'),
-                    buildRadioTile2('Energy Metals'),
-                    buildRadioTile2('Bulk Commodities'),
-                    buildRadioTile2('Speciality Metals'),
-                    buildRadioTile2('Industrial Minerals'),
-                  ],
+                  runSpacing: 3,
+                  children: filtersViewModel
+                          .commoditiesValuesMap["Commodity Sector"]
+                          ?.map((value) => buildRadioTile2(value))
+                          .toList() ??
+                      [],
                 ),
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -104,24 +109,10 @@ class _FilterScreenState extends State<FilterScreen> {
                   ],
                 ),
                 Wrap(
-                  spacing: 10, // Horizontal spacing
-                  runSpacing: 10, // Vertical spacing
+                  spacing: 10,
+                  runSpacing: 10,
                   children: _selectedcheckboxOptions.keys.map((option) {
-                    return SizedBox(
-                      width: (MediaQuery.of(context).size.width - 40) /
-                          2, // Calculate width based on screen size
-                      child: ListTile(
-                        title: Text(option),
-                        leading: Checkbox(
-                          value: _selectedcheckboxOptions[option],
-                          onChanged: (bool? value) {
-                            setState(() {
-                              _selectedcheckboxOptions[option] = value ?? false;
-                            });
-                          },
-                        ),
-                      ),
-                    );
+                    return buildCheckboxTile(option);
                   }).toList(),
                 ),
                 const Row(
@@ -137,13 +128,11 @@ class _FilterScreenState extends State<FilterScreen> {
                 Wrap(
                   spacing: 5,
                   runSpacing: 3,
-                  children: [
-                    buildRadioTile3('Care and Maintenance'),
-                    buildRadioTile3('Development'),
-                    buildRadioTile3('Production'),
-                    buildRadioTile3('Early stage exploration'),
-                    buildRadioTile3('Advanced stage exploration'),
-                  ],
+                  children: filtersViewModel
+                          .promptValuesMap["Project Stage/Asset Status"]
+                          ?.map((value) => buildRadioTile3(value))
+                          .toList() ??
+                      [],
                 ),
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -158,14 +147,46 @@ class _FilterScreenState extends State<FilterScreen> {
                 Wrap(
                   spacing: 5,
                   runSpacing: 3,
+                  children: filtersViewModel.intentionValuesMap["Intention"]
+                          ?.map((value) => buildRadioTile4(value))
+                          .toList() ??
+                      [],
+                ),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    buildRadioTile4('Farm in / Farm out'),
-                    buildRadioTile4('Direct Sale'),
-                    buildRadioTile4('Join venture'),
-                    buildRadioTile4('Lease'),
-                    buildRadioTile4('All Offers'),
+                    Text(
+                      "Price Range",
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                   ],
                 ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: buildPriceDropdown("Min Price", _selectedMinPrice,
+                          filtersViewModel.priceRange!.minPriceRange!,
+                          (int? newValue) {
+                        setState(() {
+                          _selectedMinPrice = newValue;
+                        });
+                      }),
+                    ),
+                    Expanded(
+                      child: buildPriceDropdown("Max Price", _selectedMaxPrice,
+                          filtersViewModel.priceRange!.maxPriceRange!,
+                          (int? newValue) {
+                        setState(() {
+                          _selectedMaxPrice = newValue;
+                        });
+                      }),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -201,37 +222,39 @@ class _FilterScreenState extends State<FilterScreen> {
     );
   }
 
-  Widget buildRadioTile(String option) {
+  Widget buildRadioTile(
+      String option, String? selectedOption, ValueChanged<String?> onChanged) {
     return SizedBox(
-      width: (MediaQuery.of(context).size.width - 40) /
-          2, // Calculate width based on screen size
+      width: (MediaQuery.of(context).size.width - 40) / 2,
       child: ListTile(
         title: Text(option),
         leading: Radio<String>(
           value: option,
-          groupValue: _selectedOption1,
-          onChanged: (String? value) {
-            setState(() {
-              _selectedOption1 = value;
-            });
-          },
+          groupValue: selectedOption,
+          onChanged: onChanged,
         ),
       ),
     );
   }
 
   Widget buildRadioTile2(String option) {
+    return buildRadioTile(option, _selectedOption4, (value) {
+      setState(() {
+        _selectedOption4 = value;
+      });
+    });
+  }
+
+  Widget buildCheckboxTile(String option) {
     return SizedBox(
-      width: (MediaQuery.of(context).size.width - 40) /
-          2, // Calculate width based on screen size
+      width: (MediaQuery.of(context).size.width - 40) / 2,
       child: ListTile(
         title: Text(option),
-        leading: Radio<String>(
-          value: option,
-          groupValue: _selectedOption2,
-          onChanged: (String? value) {
+        leading: Checkbox(
+          value: _selectedcheckboxOptions[option],
+          onChanged: (bool? value) {
             setState(() {
-              _selectedOption2 = value;
+              _selectedcheckboxOptions[option] = value ?? false;
             });
           },
         ),
@@ -240,39 +263,46 @@ class _FilterScreenState extends State<FilterScreen> {
   }
 
   Widget buildRadioTile3(String option) {
-    return SizedBox(
-      width: (MediaQuery.of(context).size.width - 40) /
-          2, // Calculate width based on screen size
-      child: ListTile(
-        title: Text(option),
-        leading: Radio<String>(
-          value: option,
-          groupValue: _selectedOption3,
-          onChanged: (String? value) {
-            setState(() {
-              _selectedOption3 = value;
-            });
-          },
-        ),
-      ),
-    );
+    return buildRadioTile(option, _selectedOption3, (value) {
+      setState(() {
+        _selectedOption3 = value;
+      });
+    });
   }
 
   Widget buildRadioTile4(String option) {
-    return SizedBox(
-      width: (MediaQuery.of(context).size.width - 40) /
-          2, // Calculate width based on screen size
-      child: ListTile(
-        title: Text(option),
-        leading: Radio<String>(
-          value: option,
-          groupValue: _selectedOption4,
-          onChanged: (String? value) {
-            setState(() {
-              _selectedOption4 = value;
-            });
-          },
-        ),
+    return buildRadioTile(option, _selectedOption4, (value) {
+      setState(() {
+        _selectedOption4 = value;
+      });
+    });
+  }
+
+  Widget buildPriceDropdown(String label, int? selectedValue, List<int> items,
+      ValueChanged<int?> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          DropdownButton<int>(
+            value: selectedValue,
+            isExpanded: true,
+            hint: Text("Select $label"),
+            items: items.map<DropdownMenuItem<int>>((int value) {
+              return DropdownMenuItem<int>(
+                value: value,
+                child: Text(value.toString()),
+              );
+            }).toList(),
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }
